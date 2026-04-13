@@ -26,12 +26,14 @@ function toPreviewUrl(url: string): string {
     // keep clean
   }
   if (/\/CSphoto\/(bkkn|ml)\//i.test(clean)) {
+    const ext = "(?:JPG|JPEG|PNG|WEBP)";
     clean = clean
-      .replace(/_001M(\.(?:JPG|JPEG|PNG))/i, "_001L$1")
-      .replace(/_001S(\.(?:JPG|JPEG|PNG))/i, "_001L$1")
-      .replace(/_001(\.(?:JPG|JPEG|PNG))/i, "_001L$1")
-      .replace(/_(\d{3})M(\.(?:JPG|JPEG|PNG))$/i, "_$1L$2")
-      .replace(/_(\d{3})S(\.(?:JPG|JPEG|PNG))$/i, "_$1L$2");
+      .replace(new RegExp(`_001M(\\.${ext})`, "i"), "_001L$1")
+      .replace(new RegExp(`_001S(\\.${ext})`, "i"), "_001L$1")
+      .replace(new RegExp(`_001(\\.${ext})$`, "i"), "_001L$1")
+      .replace(new RegExp(`_(\\d{3})M(\\.${ext})$`, "i"), "_$1L$2")
+      .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
+      .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
   }
   return clean;
 }

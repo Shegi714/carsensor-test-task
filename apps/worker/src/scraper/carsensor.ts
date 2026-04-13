@@ -46,12 +46,17 @@ const ML_CDN_HOST = "ccsrpcml.carsensor.net";
 function normalizeImageUrl(url: string): string {
   let out = makeAbsoluteUrl(url).replace(/^http:\/\//i, "https://");
   out = out.replace(/\?.*$/, "");
+  const ext = "(?:JPG|JPEG|PNG|WEBP)";
   out = out
     .replace(/\/SUZ(\d+_\d+_001\.jpg)$/i, "/UZ$1")
-    .replace(/(\/[A-Z0-9]+_\d{3})M(\.(?:JPG|JPEG|PNG))/i, "$1L$2")
-    .replace(/(\/[A-Z0-9]+_\d{3})S(\.(?:JPG|JPEG|PNG))/i, "$1L$2")
-    .replace(/_(\d{3})M(\.(?:JPG|JPEG|PNG))$/i, "_$1L$2")
-    .replace(/_(\d{3})S(\.(?:JPG|JPEG|PNG))$/i, "_$1L$2");
+    .replace(new RegExp(`(/[A-Z0-9]+_\\d{3})M(\\.${ext})`, "i"), "$1L$2")
+    .replace(new RegExp(`(/[A-Z0-9]+_\\d{3})S(\\.${ext})`, "i"), "$1L$2")
+    .replace(new RegExp(`_(\\d{3})M(\\.${ext})$`, "i"), "_$1L$2")
+    .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
+    .replace(new RegExp(`_001M(\\.${ext})`, "i"), "_001L$1")
+    .replace(new RegExp(`_001S(\\.${ext})`, "i"), "_001L$1")
+    .replace(new RegExp(`_001(\\.${ext})$`, "i"), "_001L$1")
+    .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
 
   try {
     const u = new URL(out);
@@ -92,7 +97,7 @@ function isLikelyCarImage(url: string): boolean {
   try {
     const parsed = new URL(value);
     const pathname = parsed.pathname.toLowerCase();
-    if (!/\.(jpg|jpeg|png|webp)$/.test(pathname)) {
+    if (!/\.(jpe?g|png|webp)$/.test(pathname)) {
       return false;
     }
     if (/\/shopinfo\//.test(pathname)) {
@@ -104,8 +109,51 @@ function isLikelyCarImage(url: string): boolean {
   }
 }
 
+/** From a responsive srcset, pick the candidate with the largest width (or 1x/2x density as proxy). */
+function pickLargestSrcsetUrl(srcset: string): string | null {
+  let bestUrl: string | null = null;
+  let bestW = -1;
+
+  for (const part of srcset.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const tokens = trimmed.split(/\s+/);
+    const rawUrl = tokens[0];
+    if (!rawUrl) {
+      continue;
+    }
+
+    let w = 0;
+    for (let i = 1; i < tokens.length; i += 1) {
+      const wMatch = tokens[i].match(/^(\d+)w$/i);
+      if (wMatch) {
+        w = Math.max(w, Number(wMatch[1]));
+      }
+      const xMatch = tokens[i].match(/^(\d+(?:\.\d+)?)x$/i);
+      if (xMatch) {
+        w = Math.max(w, Math.round(Number(xMatch[1]) * 640));
+      }
+    }
+    if (w === 0) {
+      w = 1;
+    }
+
+    if (w > bestW) {
+      bestW = w;
+      bestUrl = rawUrl;
+    }
+  }
+
+  return bestUrl;
+}
+
 function collectImageCandidate($element: any): string[] {
   const attrs = [
+    $element.attr("data-zoom-image"),
+    $element.attr("data-zoom"),
+    $element.attr("data-large"),
     $element.attr("data-original"),
     $element.attr("data-src"),
     $element.attr("data-lazy"),
@@ -114,12 +162,42 @@ function collectImageCandidate($element: any): string[] {
 
   const srcSet = $element.attr("srcset");
   if (srcSet) {
-    for (const part of srcSet.split(",")) {
-      attrs.push(part.trim().split(" ")[0]);
+    const best = pickLargestSrcsetUrl(srcSet);
+    if (best) {
+      attrs.push(best);
     }
   }
 
+  const parentHref = $element.closest?.("a")?.attr?.("href");
+  if (parentHref && /csphoto\/(bkkn|ml)\//i.test(parentHref)) {
+    attrs.push(parentHref);
+  }
+
   return attrs.filter((value): value is string => Boolean(value));
+}
+
+/** URLs embedded in HTML/JSON (gallery often duplicates sizes here with full L-size). */
+function extractCsphotoUrlsFromHtml(html: string): string[] {
+  const found = new Set<string>();
+  const abs =
+    /https?:\/\/[a-z0-9.-]*carsensor\.net\/[^\s"'<>{}\\]+\/CSphoto\/(?:bkkn|ml)\/[^\s"'<>{}\\]+\.(?:jpe?g|png|webp)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = abs.exec(html)) !== null) {
+    found.add(m[0]);
+  }
+
+  const cdn =
+    /https:\/\/ccsrpcml\.carsensor\.net\/[^\s"'<>{}\\]+\/CSphoto\/ml\/[^\s"'<>{}\\]+\.(?:jpe?g|png|webp)/gi;
+  while ((m = cdn.exec(html)) !== null) {
+    found.add(m[0]);
+  }
+
+  const quotedRel = /["'](\/CSphoto\/(?:bkkn|ml)\/[^"'?\s]+\.(?:jpe?g|png|webp))["']/gi;
+  while ((m = quotedRel.exec(html)) !== null) {
+    found.add(makeAbsoluteUrl(m[1]));
+  }
+
+  return [...found];
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -180,16 +258,47 @@ function parseListingUrls(html: string): string[] {
 
 function parseCard(html: string, sourceUrl: string): RawCarCard {
   const $ = load(html);
-  const imageUrls = new Set<string>();
+  const externalId = extractExternalId(sourceUrl);
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  function pushCarImage(raw: string) {
+    if (!isLikelyCarImage(raw)) {
+      return;
+    }
+    const normalized = normalizeImageUrl(raw);
+    if (seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    ordered.push(normalized);
+  }
+
+  $("picture source[srcset]").each((_, element) => {
+    const srcset = $(element).attr("srcset");
+    if (srcset) {
+      const best = pickLargestSrcsetUrl(srcset);
+      if (best) {
+        pushCarImage(best);
+      }
+    }
+  });
 
   $("img").each((_, element) => {
     const candidates = collectImageCandidate($(element));
     for (const candidate of candidates) {
-      if (isLikelyCarImage(candidate)) {
-        imageUrls.add(normalizeImageUrl(candidate));
-      }
+      pushCarImage(candidate);
     }
   });
+
+  if (externalId) {
+    const idUpper = externalId.toUpperCase();
+    for (const raw of extractCsphotoUrlsFromHtml(html)) {
+      if (raw.toUpperCase().includes(idUpper)) {
+        pushCarImage(raw);
+      }
+    }
+  }
 
   return {
     sourceUrl,
@@ -202,7 +311,7 @@ function parseCard(html: string, sourceUrl: string): RawCarCard {
     transmissionRaw: safeText(html, ["th:contains('ミッション') + td", ".transmission"]),
     fuelRaw: safeText(html, ["th:contains('燃料') + td", ".fuel"]),
     locationRaw: safeText(html, ["th:contains('地域') + td", ".location"]),
-    imageUrls: [...imageUrls].slice(0, MAX_IMAGES_PER_CAR)
+    imageUrls: ordered.slice(0, MAX_IMAGES_PER_CAR)
   };
 }
 
