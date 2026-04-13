@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { cacheImage } from "./image-cache.js";
-import { scrapeCarsensorCarByUrl } from "./scraper/carsensor.js";
+import { normalizeImageUrl, scrapeCarsensorCarByUrl } from "./scraper/carsensor.js";
 
 const IMAGE_CACHE_PASSES = Number(process.env.IMAGE_CACHE_PASSES ?? 4);
 const SCRAPE_RETRIES = Number(process.env.REHYDRATE_SCRAPE_RETRIES ?? 3);
@@ -42,7 +42,11 @@ export async function rehydrateAllCarImages(prisma: PrismaClient): Promise<void>
 
       const finalImages: string[] = [];
       for (let index = 0; index < scraped.images.length; index += 1) {
-        const localUrl = await cacheImage(carKey, index, scraped.images[index], {
+        const remoteUrl = scraped.images[index];
+        if (!remoteUrl) {
+          continue;
+        }
+        const localUrl = await cacheImage(carKey, index, remoteUrl, {
           passes: IMAGE_CACHE_PASSES,
           force: true
         });
@@ -54,7 +58,10 @@ export async function rehydrateAllCarImages(prisma: PrismaClient): Promise<void>
         const fallback = existingImages[index]?.url;
         if (fallback?.startsWith("/uploads/")) {
           finalImages.push(fallback);
+          continue;
         }
+
+        finalImages.push(normalizeImageUrl(remoteUrl));
       }
 
       if (finalImages.length === 0) {

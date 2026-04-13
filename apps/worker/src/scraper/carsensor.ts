@@ -43,7 +43,7 @@ function makeAbsoluteUrl(url: string): string {
 
 const ML_CDN_HOST = "ccsrpcml.carsensor.net";
 
-function normalizeImageUrl(url: string): string {
+export function normalizeImageUrl(url: string): string {
   let out = makeAbsoluteUrl(url).replace(/^http:\/\//i, "https://");
   out = out.replace(/\?.*$/, "");
   const ext = "(?:JPG|JPEG|PNG|WEBP)";
@@ -109,10 +109,15 @@ function isLikelyCarImage(url: string): boolean {
   }
 }
 
-/** From a responsive srcset, pick the candidate with the largest width (or 1x/2x density as proxy). */
+/**
+ * From a responsive srcset, pick the largest candidate.
+ * If there are no `640w`-style descriptors, entries are often listed smallest→largest (mobile-first);
+ * in that case the first URL was wrongly "winning" when we assigned equal weights — take the last.
+ */
 function pickLargestSrcsetUrl(srcset: string): string | null {
-  let bestUrl: string | null = null;
-  let bestW = -1;
+  type Cand = { url: string; w: number; order: number };
+  const list: Cand[] = [];
+  let order = 0;
 
   for (const part of srcset.split(",")) {
     const trimmed = part.trim();
@@ -136,17 +141,20 @@ function pickLargestSrcsetUrl(srcset: string): string | null {
         w = Math.max(w, Math.round(Number(xMatch[1]) * 640));
       }
     }
-    if (w === 0) {
-      w = 1;
-    }
-
-    if (w > bestW) {
-      bestW = w;
-      bestUrl = rawUrl;
-    }
+    list.push({ url: rawUrl, w, order });
+    order += 1;
   }
 
-  return bestUrl;
+  if (!list.length) {
+    return null;
+  }
+
+  const withW = list.filter((c) => c.w > 0);
+  if (withW.length > 0) {
+    return withW.reduce((best, c) => (c.w > best.w ? c : best)).url;
+  }
+
+  return list[list.length - 1].url;
 }
 
 function collectImageCandidate($element: any): string[] {

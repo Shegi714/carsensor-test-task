@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 dotenv.config({ path: path.resolve(__dirname, "../../api/.env") });
 dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 import { PrismaClient } from "@prisma/client";
-import { scrapeCarsensorCars } from "./scraper/carsensor.js";
+import { normalizeImageUrl, scrapeCarsensorCars } from "./scraper/carsensor.js";
 import { cacheImage } from "./image-cache.js";
 
 const prisma = new PrismaClient();
@@ -32,6 +32,9 @@ async function syncCars() {
       const finalImages: string[] = [];
       for (let index = 0; index < car.images.length; index += 1) {
         const remoteUrl = car.images[index];
+        if (!remoteUrl) {
+          continue;
+        }
         const localUrl = await cacheImage(carKey, index, remoteUrl, {
           passes: IMAGE_CACHE_PASSES,
           force: IMAGE_CACHE_FORCE
@@ -44,7 +47,11 @@ async function syncCars() {
         const fallbackLocal = existingImages[index]?.url;
         if (fallbackLocal?.startsWith("/uploads/")) {
           finalImages.push(fallbackLocal);
+          continue;
         }
+
+        // After deploy (ephemeral disk) or download failure: still show photos from CarSensor CDN.
+        finalImages.push(normalizeImageUrl(remoteUrl));
       }
 
       const saved = await prisma.car.upsert({
