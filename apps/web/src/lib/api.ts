@@ -1,6 +1,18 @@
 import type { Car, CarsResponse } from "./types";
 
-export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+/** Сборка без VITE_API_URL: на Render подставляем API по тому же суффиксу, что и carsensor-web. */
+function resolveApiBase(): string {
+  const env = import.meta.env.VITE_API_URL;
+  if (typeof env === "string" && env.trim() !== "") return env.trim();
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    const m = /^carsensor-web((?:-[a-z0-9]+)?)\.onrender\.com$/i.exec(h);
+    if (m) return `https://carsensor-api${m[1]}.onrender.com`;
+  }
+  return "http://localhost:4000";
+}
+
+export const API_URL = resolveApiBase().replace(/\/$/, "");
 const DEMO_USERNAME = import.meta.env.VITE_DEMO_USERNAME ?? "admin";
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "admin123";
 

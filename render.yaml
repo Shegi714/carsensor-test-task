@@ -1,6 +1,7 @@
 # Render Blueprint: Postgres + API (with embedded worker) + static frontend.
 # After pushing to GitHub: Dashboard → New → Blueprint → select this repo → apply.
-# If the API service name changes, update VITE_API_URL for carsensor-web to https://<that-name>.onrender.com
+# VITE_API_URL берётся из публичного URL API (RENDER_EXTERNAL_URL), чтобы при суффиксе
+# carsensor-api-xxxxx не указывать вручную https://carsensor-api.onrender.com (оно бывает занято).
 databases:
   - name: carsensor-db
     plan: free
@@ -34,4 +35,7 @@ services:
       - key: NODE_VERSION
         value: 20.18.0
       - key: VITE_API_URL
-        value: https://carsensor-api.onrender.com
+        fromService:
+          name: carsensor-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL

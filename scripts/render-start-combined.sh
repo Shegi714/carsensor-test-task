@@ -7,6 +7,6 @@ cd "$ROOT"
 export UPLOADS_DIR="${UPLOADS_DIR:-$ROOT/uploads}"
 mkdir -p "$UPLOADS_DIR"
 npm --workspace @cars/api run prisma:deploy
-npm --workspace @cars/api run prisma:seed
+npm --workspace @cars/api run prisma:seed || echo "[render-start] prisma:seed non-zero, continuing"
 node apps/worker/dist/index.js &
 exec node apps/api/dist/main.js

@@ -6,13 +6,28 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const prisma = new PrismaClient();
 const app = express();
 const uploadsRoot =
-  process.env.UPLOADS_DIR ?? path.resolve(process.cwd(), "..", "..", "uploads");
+  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
+    ? path.resolve(process.env.UPLOADS_DIR)
+    : path.resolve(__dirname, "../../../uploads");
 
-app.use(cors());
+app.set("trust proxy", true);
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86_400
+  })
+);
+app.options("*", cors());
 app.use(express.json());
 app.use("/uploads", express.static(uploadsRoot));
 
@@ -174,6 +189,6 @@ app.get("/cars/:id", authMiddleware, async (req, res) => {
   return res.json(car);
 });
 
-app.listen(port, () => {
-  console.log(`API started on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+  console.log(`API listening on 0.0.0.0:${port} (PORT=${process.env.PORT ?? ""})`);
 });
