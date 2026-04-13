@@ -52,7 +52,7 @@
    cp apps/web/.env.example apps/web/.env
    ```
 
-   В `apps/web/.env` задайте `VITE_API_URL=http://localhost:4000` (в проде — публичный URL API).
+   В `apps/web/.env` задайте `VITE_API_URL=http://localhost:4000`. Если API отдаёт и статику с того же хоста (см. Render), переменную можно не задавать или оставить пустой.
 
 5. **Запуск (три процесса)**
 
@@ -83,7 +83,7 @@
 
 | Переменная | Назначение |
 |------------|------------|
-| `VITE_API_URL` | Базовый URL API (без слэша в конце) |
+| `VITE_API_URL` | Базовый URL API (без слэша). Пусто = тот же origin, что и страница (см. раздача SPA из API на Render) |
 | `VITE_DEMO_USERNAME` / `VITE_DEMO_PASSWORD` | Логин для авто-запросов к API с фронта (по умолчанию admin / admin123) |
 
 ## Полезные команды
@@ -148,7 +148,7 @@ npm --workspace @cars/worker run fresh:images
    npm run build:web
    ```
 
-   Артефакты в `apps/web/dist`. Задайте `VITE_API_URL` на **публичный HTTPS-URL API** на этапе сборки.
+   Артефакты в `apps/web/dist`. Для отдельного хостинга статики задайте `VITE_API_URL` на публичный URL API; для одного сервиса с API — пусто.
 
 ## Рекомендуемая схема деплоя
 
@@ -170,12 +170,12 @@ npm --workspace @cars/worker run fresh:images
 
 ## Render
 
-В корне лежит [`render.yaml`](render.yaml): managed Postgres (`carsensor-db`), один веб-сервис **`carsensor-api`** (API + воркер в одном процессе через [`scripts/render-start-combined.sh`](scripts/render-start-combined.sh), чтобы общий каталог `uploads/` был одним и тем же), статика **`carsensor-web`**.
+В корне лежит [`render.yaml`](render.yaml): Postgres **`carsensor-db`** и один сервис **`carsensor-api`**: API + воркер ([`scripts/render-start-combined.sh`](scripts/render-start-combined.sh)) и **раздача собранного фронта** с того же URL (папка `apps/web/dist`), чтобы картинки и API были **одного origin** — иначе Chrome/защита часто блокируют `<img>` с другого поддомена (`ERR_BLOCKED_BY_CLIENT`).
 
-1. Запушьте репозиторий на GitHub (публичный).
-2. [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint** → укажите репозиторий → подтвердите создание ресурсов.
-3. Дождитесь деплоя API, затем при необходимости пересоберите фронт: в настройках `carsensor-web` переменная **`VITE_API_URL`** должна совпадать с публичным URL API (в blueprint задано `https://carsensor-api.onrender.com`; если переименуете сервис — обновите URL и сделайте **Manual Deploy** для веба).
-4. Логин в каталог: **`admin` / `admin123`** (сид при старте контейнера API, вместе с `prisma migrate deploy` — на free tier нет `preDeployCommand`).
+1. Запушьте репозиторий на GitHub.
+2. Blueprint / деплой: при сборке задано **`VITE_API_URL=`** (пусто) — фронт ходит на относительные `/auth`, `/cars`, `/uploads`, `/m/b`.
+3. **Откройте каталог по URL API**, например `https://carsensor-api.onrender.com/` (старый отдельный static `carsensor-web` в blueprint больше не создаётся; старый адрес можно удалить вручную в Render).
+4. Логин: **`admin` / `admin123`**.
 
 У бесплатного веб-сервиса возможен **cold start**; диск эфемерный — при рестарте кеш `uploads` пропадает. Воркер при недоступном локальном файле сохраняет в БД **прямой URL CDN CarSensor**, чтобы каталог не оставался без фото; при успешном скачивании по-прежнему используется `/uploads/...`.
 

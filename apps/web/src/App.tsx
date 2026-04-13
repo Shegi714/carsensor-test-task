@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { loadCarById, loadCars } from "./lib/api";
+import { API_URL, loadCarById, loadCars } from "./lib/api";
 import type { Car } from "./lib/types";
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function base64UrlEncodeUtf8(text: string): string {
   const bytes = new TextEncoder().encode(text);

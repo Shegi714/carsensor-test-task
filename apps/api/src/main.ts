@@ -5,7 +5,11 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const prisma = new PrismaClient();
 const app = express();
@@ -239,6 +243,32 @@ app.get("/cars/:id", authMiddleware, async (req, res) => {
 
   return res.json(car);
 });
+
+const webDistDir = process.env.WEB_DIST
+  ? path.resolve(process.env.WEB_DIST)
+  : path.resolve(__dirname, "../../web/dist");
+if (existsSync(path.join(webDistDir, "index.html"))) {
+  console.log(`[api] also serving SPA from ${webDistDir}`);
+  app.use(express.static(webDistDir, { index: false }));
+  app.use((req, res, next) => {
+    if (req.method !== "GET") {
+      return next();
+    }
+    if (
+      req.path.startsWith("/uploads") ||
+      req.path.startsWith("/m/b") ||
+      req.path === "/health" ||
+      req.path.startsWith("/auth") ||
+      req.path.startsWith("/cars")
+    ) {
+      return next();
+    }
+    if (path.extname(req.path)) {
+      return next();
+    }
+    return res.sendFile(path.join(webDistDir, "index.html"));
+  });
+}
 
 app.listen(port, () => {
   console.log(`API started on http://localhost:${port}`);
