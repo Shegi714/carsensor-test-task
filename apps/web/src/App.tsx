@@ -2,15 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, loadCarById, loadCars } from "./lib/api";
 import type { Car } from "./lib/types";
 
-function base64UrlEncodeUtf8(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 1) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function toPreviewUrl(url: string): string {
   if (url.startsWith("/uploads/")) {
     return `${API_URL}${url}`;
@@ -43,19 +34,6 @@ function toPreviewUrl(url: string): string {
       .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
       .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
   }
-  try {
-    const u = new URL(clean.startsWith("//") ? `https:${clean}` : clean);
-    const host = u.hostname.toLowerCase();
-    const path = u.pathname;
-    if (
-      (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(path)) ||
-      (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(path))
-    ) {
-      return `${API_URL}/m/b?t=${encodeURIComponent(base64UrlEncodeUtf8(u.toString()))}`;
-    }
-  } catch {
-    // keep clean
-  }
   return clean;
 }
 
@@ -65,7 +43,7 @@ function Card({ car }: { car: Car }) {
     if (!main) {
       return [];
     }
-    return [toPreviewUrl(main)];
+    return [...new Set([toPreviewUrl(main), main])];
   }, [main]);
 
   const [srcIndex, setSrcIndex] = useState(0);

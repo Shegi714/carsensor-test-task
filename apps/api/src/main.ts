@@ -5,11 +5,7 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const prisma = new PrismaClient();
 const app = express();
@@ -19,72 +15,6 @@ const uploadsRoot =
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(uploadsRoot));
-
-function parseAllowedCarsensorUpstream(rawUrl: string): URL | null {
-  let target: URL;
-  try {
-    target = new URL(rawUrl);
-  } catch {
-    return null;
-  }
-  if (target.protocol !== "https:") {
-    return null;
-  }
-  const host = target.hostname.toLowerCase();
-  const pathname = target.pathname;
-  const allowed =
-    (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(pathname)) ||
-    (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(pathname));
-  return allowed ? target : null;
-}
-
-/**
- * CarSensor CDN 403s wrong Referer. Path/query avoid "proxy", "image", "carsensor" substrings so adblockers
- * (ERR_BLOCKED_BY_CLIENT) skip the request; target is base64url in `t`.
- */
-app.get("/m/b", async (req, res) => {
-  const raw = req.query.t;
-  if (typeof raw !== "string" || raw.length > 8192) {
-    return res.status(400).end();
-  }
-
-  let decoded: string;
-  try {
-    decoded = Buffer.from(raw, "base64url").toString("utf8");
-  } catch {
-    return res.status(400).end();
-  }
-
-  const target = parseAllowedCarsensorUpstream(decoded);
-  if (!target) {
-    return res.status(400).end();
-  }
-
-  try {
-    const upstream = await fetch(target.toString(), {
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
-        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        referer: "https://www.carsensor.net/"
-      }
-    });
-
-    if (!upstream.ok) {
-      return res.status(upstream.status === 404 ? 404 : 502).end();
-    }
-
-    const ct = upstream.headers.get("content-type");
-    if (ct) {
-      res.setHeader("content-type", ct);
-    }
-    res.setHeader("cache-control", "public, max-age=86400");
-    const buf = Buffer.from(await upstream.arrayBuffer());
-    return res.status(200).send(buf);
-  } catch {
-    return res.status(502).end();
-  }
-});
 
 const jwtSecret = process.env.JWT_SECRET ?? "dev_secret";
 const jwtExpiresIn = (process.env.JWT_EXPIRES_IN ?? "12h") as SignOptions["expiresIn"];
@@ -243,32 +173,6 @@ app.get("/cars/:id", authMiddleware, async (req, res) => {
 
   return res.json(car);
 });
-
-const webDistDir = process.env.WEB_DIST
-  ? path.resolve(process.env.WEB_DIST)
-  : path.resolve(__dirname, "../../web/dist");
-if (existsSync(path.join(webDistDir, "index.html"))) {
-  console.log(`[api] also serving SPA from ${webDistDir}`);
-  app.use(express.static(webDistDir, { index: false }));
-  app.use((req, res, next) => {
-    if (req.method !== "GET") {
-      return next();
-    }
-    if (
-      req.path.startsWith("/uploads") ||
-      req.path.startsWith("/m/b") ||
-      req.path === "/health" ||
-      req.path.startsWith("/auth") ||
-      req.path.startsWith("/cars")
-    ) {
-      return next();
-    }
-    if (path.extname(req.path)) {
-      return next();
-    }
-    return res.sendFile(path.join(webDistDir, "index.html"));
-  });
-}
 
 app.listen(port, () => {
   console.log(`API started on http://localhost:${port}`);

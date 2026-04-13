@@ -1,12 +1,6 @@
 import type { Car, CarsResponse } from "./types";
 
-const viteApi = import.meta.env.VITE_API_URL;
-const trimmed =
-  viteApi != null && String(viteApi).trim() !== "" ? String(viteApi).replace(/\/$/, "") : "";
-
-/** Пустая строка = тот же origin (API раздаёт собранный фронт, см. Render). Иначе полный URL API. */
-export const API_URL =
-  trimmed !== "" ? trimmed : import.meta.env.DEV ? "http://localhost:4000" : "";
+export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const DEMO_USERNAME = import.meta.env.VITE_DEMO_USERNAME ?? "admin";
 const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "admin123";
 
