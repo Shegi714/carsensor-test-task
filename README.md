@@ -124,7 +124,7 @@ npm --workspace @cars/worker run fresh:images
 
 - Расписание: **каждый час** (`0 * * * *`), плюс один прогон при старте.
 - Источник: листинг `usedcar/index.html`, затем страницы объявлений.
-- Фото: нормализация URL (в т.ч. CDN `ccsrpcml`, суффикс `L`), выбор **крупнейшего** варианта из `srcset`, доп. поиск URL в HTML; сохранение в `uploads/cars`, в БД пути вида `/uploads/cars/...`. После обновления логики качества на проде: один прогон с `IMAGE_CACHE_FORCE=1` **или** `npm --workspace @cars/worker run rehydrate:images` (там уже `force`).
+- Фото: нормализация URL (в т.ч. CDN `ccsrpcml`, суффикс `L`), выбор **крупнейшего** варианта из `srcset`, доп. поиск URL в HTML; сохранение в `uploads/cars`, в БД пути вида `/uploads/cars/...`. После обновления логики качества на проде: один прогон с `IMAGE_CACHE_FORCE=1` **или** регидрация (`rehydrate:images` локально / `rehydrate:images:prod` в Render Shell — там уже `force`).
 - Тексты полей нормализуются в `apps/worker/src/scraper/normalize.ts`.
 
 ## Сборка под выкладку
