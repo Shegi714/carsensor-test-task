@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Car {
+  id                    String     @id @default(cuid())
+  sourceUrl             String     @unique
+  externalId            String?
+  make                  String
+  model                 String
+  year                  Int?
+  mileageKm             Int?
+  priceJpy              Int?
+  transmission          String?
+  fuelType              String?
+  driveType             String?
+  engineVolume          String?
+  bodyType              String?
+  color                 String?
+  location              String?
+  descriptionRawJa      String?
+  descriptionNormalized String?
+  firstSeenAt           DateTime   @default(now())
+  lastSeenAt            DateTime   @default(now())
+  isActive              Boolean    @default(true)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  images                CarImage[]
+}
+
+model CarImage {
+  id       String  @id @default(cuid())
+  carId    String
+  url      String
+  position Int     @default(0)
+  isMain   Boolean @default(false)
+  car      Car     @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+}

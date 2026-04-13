@@ -1,0 +1,37 @@
+# Render Blueprint: Postgres + API (with embedded worker) + static frontend.
+# After pushing to GitHub: Dashboard → New → Blueprint → select this repo → apply.
+# If the API service name changes, update VITE_API_URL for carsensor-web to https://<that-name>.onrender.com
+databases:
+  - name: carsensor-db
+    plan: free
+    databaseName: carsensor
+
+services:
+  - type: web
+    name: carsensor-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm --workspace @cars/api run prisma:generate && npm run build
+    preDeployCommand: npm --workspace @cars/api run prisma:deploy && npm --workspace @cars/api run prisma:seed
+    startCommand: bash scripts/render-start-combined.sh
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: carsensor-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: web
+    name: carsensor-web
+    runtime: static
+    buildCommand: npm ci && npm run build:web
+    staticPublishPath: apps/web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: VITE_API_URL
+        value: https://carsensor-api.onrender.com

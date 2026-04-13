@@ -1,0 +1,17 @@
+{
+  "name": "carsensor-test-task",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @cars/api run dev",
+    "dev:worker": "npm --workspace @cars/worker run dev",
+    "dev:web": "npm --workspace @cars/web run dev",
+    "build": "npm run -ws build",
+    "start:api": "npm --workspace @cars/api run start",
+    "start:worker": "npm --workspace @cars/worker run start",
+    "build:web": "npm --workspace @cars/web run build"
+  }
+}
