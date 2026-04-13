@@ -119,6 +119,7 @@ npm --workspace @cars/worker run fresh:images
 - `GET /cars` — список (query: `page`, `limit`, фильтры по марке/году/цене/пробегу, `sortBy`, `sortOrder`). Нужен заголовок `Authorization: Bearer <token>`
 - `GET /cars/:id` — карточка с `images[]`. JWT обязателен
 - Статика: `GET /uploads/...` — закешированные фото
+- `GET /proxy/carsensor-image?url=<encoded https>` — публичный прокси к CDN CarSensor с нужным `Referer` (фронт подставляет сам для URL с `/CSphoto/`)
 
 ## Воркер
 

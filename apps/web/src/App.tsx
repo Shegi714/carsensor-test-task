@@ -35,6 +35,19 @@ function toPreviewUrl(url: string): string {
       .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
       .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
   }
+  try {
+    const u = new URL(clean.startsWith("//") ? `https:${clean}` : clean);
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname;
+    if (
+      (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(path)) ||
+      (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(path))
+    ) {
+      return `${API_URL}/proxy/carsensor-image?url=${encodeURIComponent(u.toString())}`;
+    }
+  } catch {
+    // keep clean
+  }
   return clean;
 }
 
@@ -44,7 +57,7 @@ function Card({ car }: { car: Car }) {
     if (!main) {
       return [];
     }
-    return [...new Set([toPreviewUrl(main), main])];
+    return [toPreviewUrl(main)];
   }, [main]);
 
   const [srcIndex, setSrcIndex] = useState(0);

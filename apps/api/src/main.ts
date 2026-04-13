@@ -16,6 +16,60 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(uploadsRoot));
 
+/** CarSensor CDN often 403s hotlinked images (wrong Referer). Browser img cannot set Referer; fetch via API. */
+app.get("/proxy/carsensor-image", async (req, res) => {
+  const raw = req.query.url;
+  if (typeof raw !== "string" || raw.length > 4096) {
+    return res.status(400).end();
+  }
+
+  let target: URL;
+  try {
+    target = new URL(raw);
+  } catch {
+    return res.status(400).end();
+  }
+
+  if (target.protocol !== "https:") {
+    return res.status(400).end();
+  }
+
+  const host = target.hostname.toLowerCase();
+  const pathname = target.pathname;
+  const allowed =
+    (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(pathname)) ||
+    (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(pathname));
+
+  if (!allowed) {
+    return res.status(400).end();
+  }
+
+  try {
+    const upstream = await fetch(target.toString(), {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        referer: "https://www.carsensor.net/"
+      }
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status === 404 ? 404 : 502).end();
+    }
+
+    const ct = upstream.headers.get("content-type");
+    if (ct) {
+      res.setHeader("content-type", ct);
+    }
+    res.setHeader("cache-control", "public, max-age=86400");
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    return res.status(200).send(buf);
+  } catch {
+    return res.status(502).end();
+  }
+});
+
 const jwtSecret = process.env.JWT_SECRET ?? "dev_secret";
 const jwtExpiresIn = (process.env.JWT_EXPIRES_IN ?? "12h") as SignOptions["expiresIn"];
 const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
