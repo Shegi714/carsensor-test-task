@@ -105,6 +105,9 @@ npm --workspace @cars/api run db:reset-cars
 # Перекачать фото по текущим объявлениям (обновить записи CarImage)
 npm --workspace @cars/worker run rehydrate:images
 
+# То же на проде без tsx (Render Shell из корня репо после сборки)
+npm --workspace @cars/worker run rehydrate:images:prod
+
 # Удалить все файлы в uploads/cars и заново скачать
 npm --workspace @cars/worker run fresh:images
 ```
