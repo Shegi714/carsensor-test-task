@@ -119,7 +119,7 @@ npm --workspace @cars/worker run fresh:images
 - `GET /cars` — список (query: `page`, `limit`, фильтры по марке/году/цене/пробегу, `sortBy`, `sortOrder`). Нужен заголовок `Authorization: Bearer <token>`
 - `GET /cars/:id` — карточка с `images[]`. JWT обязателен
 - Статика: `GET /uploads/...` — закешированные фото
-- `GET /proxy/carsensor-image?url=<encoded https>` — публичный прокси к CDN CarSensor с нужным `Referer` (фронт подставляет сам для URL с `/CSphoto/`)
+- `GET /m/b?t=<base64url>` — публичный прокси к CDN CarSensor с нужным `Referer` (`t` — UTF-8 URL после decode; короткий путь без слов вроде `proxy`/`image`, чтобы реже резалось расширениями вроде uBlock). Если в DevTools `ERR_BLOCKED_BY_CLIENT` — отключите блокировщик для сайта.
 
 ## Воркер
 

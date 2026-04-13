@@ -3,6 +3,15 @@ import { loadCarById, loadCars } from "./lib/api";
 import type { Car } from "./lib/types";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
+function base64UrlEncodeUtf8(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 function toPreviewUrl(url: string): string {
   if (url.startsWith("/uploads/")) {
     return `${API_URL}${url}`;
@@ -43,7 +52,7 @@ function toPreviewUrl(url: string): string {
       (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(path)) ||
       (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(path))
     ) {
-      return `${API_URL}/proxy/carsensor-image?url=${encodeURIComponent(u.toString())}`;
+      return `${API_URL}/m/b?t=${encodeURIComponent(base64UrlEncodeUtf8(u.toString()))}`;
     }
   } catch {
     // keep clean

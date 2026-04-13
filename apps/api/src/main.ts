@@ -16,31 +16,43 @@ app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(uploadsRoot));
 
-/** CarSensor CDN often 403s hotlinked images (wrong Referer). Browser img cannot set Referer; fetch via API. */
-app.get("/proxy/carsensor-image", async (req, res) => {
-  const raw = req.query.url;
-  if (typeof raw !== "string" || raw.length > 4096) {
-    return res.status(400).end();
-  }
-
+function parseAllowedCarsensorUpstream(rawUrl: string): URL | null {
   let target: URL;
   try {
-    target = new URL(raw);
+    target = new URL(rawUrl);
   } catch {
-    return res.status(400).end();
+    return null;
   }
-
   if (target.protocol !== "https:") {
-    return res.status(400).end();
+    return null;
   }
-
   const host = target.hostname.toLowerCase();
   const pathname = target.pathname;
   const allowed =
     (host === "ccsrpcml.carsensor.net" && /^\/CSphoto\/ml\//i.test(pathname)) ||
     (host === "www.carsensor.net" && /^\/CSphoto\/(bkkn|ml)\//i.test(pathname));
+  return allowed ? target : null;
+}
 
-  if (!allowed) {
+/**
+ * CarSensor CDN 403s wrong Referer. Path/query avoid "proxy", "image", "carsensor" substrings so adblockers
+ * (ERR_BLOCKED_BY_CLIENT) skip the request; target is base64url in `t`.
+ */
+app.get("/m/b", async (req, res) => {
+  const raw = req.query.t;
+  if (typeof raw !== "string" || raw.length > 8192) {
+    return res.status(400).end();
+  }
+
+  let decoded: string;
+  try {
+    decoded = Buffer.from(raw, "base64url").toString("utf8");
+  } catch {
+    return res.status(400).end();
+  }
+
+  const target = parseAllowedCarsensorUpstream(decoded);
+  if (!target) {
     return res.status(400).end();
   }
 
