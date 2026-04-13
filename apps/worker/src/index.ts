@@ -13,6 +13,8 @@ import { cacheImage } from "./image-cache.js";
 
 const prisma = new PrismaClient();
 const IMAGE_CACHE_PASSES = Number(process.env.IMAGE_CACHE_PASSES ?? 4);
+/** Set to 1 once after upgrading photo URL logic so existing files are re-downloaded (same keys on disk). */
+const IMAGE_CACHE_FORCE = process.env.IMAGE_CACHE_FORCE === "1";
 
 async function syncCars() {
   console.log(`[worker] sync started at ${new Date().toISOString()}`);
@@ -31,7 +33,8 @@ async function syncCars() {
       for (let index = 0; index < car.images.length; index += 1) {
         const remoteUrl = car.images[index];
         const localUrl = await cacheImage(carKey, index, remoteUrl, {
-          passes: IMAGE_CACHE_PASSES
+          passes: IMAGE_CACHE_PASSES,
+          force: IMAGE_CACHE_FORCE
         });
         if (localUrl) {
           finalImages.push(localUrl);
