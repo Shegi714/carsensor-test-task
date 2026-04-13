@@ -170,7 +170,7 @@ npm --workspace @cars/worker run fresh:images
 1. Запушьте репозиторий на GitHub (публичный).
 2. [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint** → укажите репозиторий → подтвердите создание ресурсов.
 3. Дождитесь деплоя API, затем при необходимости пересоберите фронт: в настройках `carsensor-web` переменная **`VITE_API_URL`** должна совпадать с публичным URL API (в blueprint задано `https://carsensor-api.onrender.com`; если переименуете сервис — обновите URL и сделайте **Manual Deploy** для веба).
-4. Логин в каталог: **`admin` / `admin123`** (сид в `preDeployCommand`).
+4. Логин в каталог: **`admin` / `admin123`** (сид при старте контейнера API, вместе с `prisma migrate deploy` — на free tier нет `preDeployCommand`).
 
 У бесплатного веб-сервиса возможен **cold start**; диск эфемерный — при рестарте кеш `uploads` обнуляется (картинки подтянутся снова по мере работы воркера).
 

@@ -12,7 +12,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci && npm --workspace @cars/api run prisma:generate && npm run build
-    preDeployCommand: npm --workspace @cars/api run prisma:deploy && npm --workspace @cars/api run prisma:seed
+    # preDeployCommand is not available on Render free web services; migrations run in start script.
     startCommand: bash scripts/render-start-combined.sh
     healthCheckPath: /health
     envVars:
