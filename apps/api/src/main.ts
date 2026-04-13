@@ -29,7 +29,19 @@ app.use(
 );
 app.options("*", cors());
 app.use(express.json());
-app.use("/uploads", express.static(uploadsRoot));
+// ORB: при кросс-доменном <img> браузер режет ответы без корректного image/* или с HTML-ошибкой.
+app.use(
+  "/uploads",
+  express.static(uploadsRoot, {
+    setHeaders(res) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+  })
+);
+app.use("/uploads", (_req, res) => {
+  res.status(404).type("text/plain").send("Not found");
+});
 
 const jwtSecret = process.env.JWT_SECRET ?? "dev_secret";
 const jwtExpiresIn = (process.env.JWT_EXPIRES_IN ?? "12h") as SignOptions["expiresIn"];

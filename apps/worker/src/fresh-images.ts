@@ -11,7 +11,9 @@ dotenv.config({ path: path.resolve(__dirname, "../../api/.env") });
 dotenv.config({ path: path.resolve(__dirname, "../.env"), override: true });
 
 const UPLOADS_ROOT =
-  process.env.UPLOADS_DIR ?? path.resolve(process.cwd(), "..", "..", "uploads");
+  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
+    ? path.resolve(process.env.UPLOADS_DIR)
+    : path.resolve(__dirname, "../../../uploads");
 const CARS_UPLOADS_DIR = path.resolve(UPLOADS_ROOT, "cars");
 
 const prisma = new PrismaClient();

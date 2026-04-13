@@ -1,8 +1,12 @@
 import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_ROOT =
-  process.env.UPLOADS_DIR ?? path.resolve(process.cwd(), "..", "..", "uploads");
+  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
+    ? path.resolve(process.env.UPLOADS_DIR)
+    : path.resolve(__dirname, "../../../uploads");
 const CARS_UPLOADS_DIR = path.resolve(UPLOADS_ROOT, "cars");
 
 function sanitizeSlug(value: string): string {
