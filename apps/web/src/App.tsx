@@ -2,7 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, loadCarById, loadCars } from "./lib/api";
 import type { Car } from "./lib/types";
 
+function isCarsensorHttpsUrl(s: string): boolean {
+  try {
+    const u = new URL(s.startsWith("//") ? `https:${s}` : s);
+    return u.protocol === "https:" && u.hostname.toLowerCase().endsWith("carsensor.net");
+  } catch {
+    return false;
+  }
+}
+
 function toPreviewUrl(url: string): string {
+  if (url.startsWith(`${API_URL}/x/csimg`)) {
+    return url;
+  }
   if (url.startsWith("/uploads/")) {
     return `${API_URL}${url}`;
   }
@@ -34,6 +46,10 @@ function toPreviewUrl(url: string): string {
       .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
       .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
   }
+  // Прямой <img> на carsensor.net даёт ERR_BLOCKED_BY_ORB; грузим через API.
+  if (isCarsensorHttpsUrl(clean)) {
+    return `${API_URL}/x/csimg?u=${encodeURIComponent(clean)}`;
+  }
   return clean;
 }
 
@@ -43,7 +59,7 @@ function Card({ car }: { car: Car }) {
     if (!main) {
       return [];
     }
-    return [...new Set([toPreviewUrl(main), main])];
+    return [toPreviewUrl(main)];
   }, [main]);
 
   const [srcIndex, setSrcIndex] = useState(0);

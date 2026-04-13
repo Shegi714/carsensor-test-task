@@ -7,6 +7,7 @@ import { z } from "zod";
 import { PrismaClient } from "@prisma/client";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerCarSensorImageProxy } from "./carsensorImageProxy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,7 @@ app.use(
   })
 );
 app.options("*", cors());
+registerCarSensorImageProxy(app);
 app.use(express.json());
 // ORB: при кросс-доменном <img> браузер режет ответы без корректного image/* или с HTML-ошибкой.
 app.use(
