@@ -1,31 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
-import { access } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { cacheImage } from "./image-cache.js";
 import { normalizeImageUrl, scrapeCarsensorCarByUrl } from "./scraper/carsensor.js";
 
 const IMAGE_CACHE_PASSES = Number(process.env.IMAGE_CACHE_PASSES ?? 4);
 const SCRAPE_RETRIES = Number(process.env.REHYDRATE_SCRAPE_RETRIES ?? 3);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsRoot =
-  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
-    ? path.resolve(process.env.UPLOADS_DIR)
-    : path.resolve(__dirname, "../../../uploads");
-
-async function localUploadExists(url: string): Promise<boolean> {
-  if (!url.startsWith("/uploads/")) {
-    return false;
-  }
-  const relativePath = url.slice("/uploads/".length);
-  const diskPath = path.resolve(uploadsRoot, relativePath);
-  try {
-    await access(diskPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+const IMAGE_STORAGE_MODE = (process.env.IMAGE_STORAGE_MODE ?? "remote").toLowerCase();
 
 async function scrapeWithRetries(sourceUrl: string) {
   let lastError: unknown;
@@ -68,6 +47,10 @@ export async function rehydrateAllCarImages(prisma: PrismaClient): Promise<void>
         if (!remoteUrl) {
           continue;
         }
+        if (IMAGE_STORAGE_MODE === "remote") {
+          finalImages.push(normalizeImageUrl(remoteUrl));
+          continue;
+        }
         const localUrl = await cacheImage(carKey, index, remoteUrl, {
           passes: IMAGE_CACHE_PASSES,
           force: true
@@ -78,12 +61,7 @@ export async function rehydrateAllCarImages(prisma: PrismaClient): Promise<void>
         }
 
         const fallback = existingImages[index]?.url;
-        if (fallback?.startsWith("/uploads/")) {
-          if (await localUploadExists(fallback)) {
-            finalImages.push(fallback);
-            continue;
-          }
-        } else if (fallback) {
+        if (fallback && !fallback.startsWith("/uploads/")) {
           finalImages.push(fallback);
           continue;
         }

@@ -1,6 +1,5 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { access } from "node:fs/promises";
 import dotenv from "dotenv";
 import cron from "node-cron";
 
@@ -16,24 +15,7 @@ const prisma = new PrismaClient();
 const IMAGE_CACHE_PASSES = Number(process.env.IMAGE_CACHE_PASSES ?? 4);
 /** Set to 1 once after upgrading photo URL logic so existing files are re-downloaded (same keys on disk). */
 const IMAGE_CACHE_FORCE = process.env.IMAGE_CACHE_FORCE === "1";
-const uploadsRoot =
-  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
-    ? path.resolve(process.env.UPLOADS_DIR)
-    : path.resolve(__dirname, "../../../uploads");
-
-async function localUploadExists(url: string): Promise<boolean> {
-  if (!url.startsWith("/uploads/")) {
-    return false;
-  }
-  const relativePath = url.slice("/uploads/".length);
-  const diskPath = path.resolve(uploadsRoot, relativePath);
-  try {
-    await access(diskPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+const IMAGE_STORAGE_MODE = (process.env.IMAGE_STORAGE_MODE ?? "remote").toLowerCase();
 
 async function syncCars() {
   console.log(`[worker] sync started at ${new Date().toISOString()}`);
@@ -54,6 +36,10 @@ async function syncCars() {
         if (!remoteUrl) {
           continue;
         }
+        if (IMAGE_STORAGE_MODE === "remote") {
+          finalImages.push(normalizeImageUrl(remoteUrl));
+          continue;
+        }
         const localUrl = await cacheImage(carKey, index, remoteUrl, {
           passes: IMAGE_CACHE_PASSES,
           force: IMAGE_CACHE_FORCE
@@ -62,15 +48,9 @@ async function syncCars() {
           finalImages.push(localUrl);
           continue;
         }
-
-        const fallbackLocal = existingImages[index]?.url;
-        if (fallbackLocal?.startsWith("/uploads/")) {
-          if (await localUploadExists(fallbackLocal)) {
-            finalImages.push(fallbackLocal);
-            continue;
-          }
-        } else if (fallbackLocal) {
-          finalImages.push(fallbackLocal);
+        const fallback = existingImages[index]?.url;
+        if (fallback && !fallback.startsWith("/uploads/")) {
+          finalImages.push(fallback);
           continue;
         }
 
