@@ -396,7 +396,10 @@ function CarDetails({
                   key={`${url}-${index}`}
                   type="button"
                   className={`thumb ${index === activeIndex ? "active" : ""}`}
-                  onClick={() => setActiveIndex(index)}
+                  onClick={() => {
+                    setActiveFailed(false);
+                    setActiveIndex(index);
+                  }}
                 >
                   <img src={url} alt={`Фото ${index + 1}`} />
                 </button>
