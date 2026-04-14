@@ -284,10 +284,12 @@ function CarDetails({
   }, [car.images]);
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activeFailed, setActiveFailed] = useState(false);
   const heroWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActiveIndex(0);
+    setActiveFailed(false);
   }, [car.id]);
 
   const activeImage = allImages[activeIndex];
@@ -309,11 +311,28 @@ function CarDetails({
   ];
 
   function showPrevImage() {
+    setActiveFailed(false);
     setActiveIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
   }
 
   function showNextImage() {
+    setActiveFailed(false);
     setActiveIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+  }
+
+  function onDetailsImageError() {
+    if (allImages.length <= 1) {
+      setActiveFailed(true);
+      return;
+    }
+    setActiveIndex((prev) => {
+      const next = prev + 1;
+      if (next < allImages.length) {
+        return next;
+      }
+      setActiveFailed(true);
+      return prev;
+    });
   }
 
   async function openFullscreen() {
@@ -341,7 +360,16 @@ function CarDetails({
         <div className="galleryColumn">
           <div className="heroImageWrap" ref={heroWrapRef}>
             {hasImages && activeImage ? (
-              <img src={activeImage} alt={`${car.make} ${car.model}`} className="heroImage" />
+              !activeFailed ? (
+                <img
+                  src={activeImage}
+                  alt={`${car.make} ${car.model}`}
+                  className="heroImage"
+                  onError={onDetailsImageError}
+                />
+              ) : (
+                <div className="imageFallback">Нет фото</div>
+              )
             ) : (
               <div className="imageFallback">Нет фото</div>
             )}
