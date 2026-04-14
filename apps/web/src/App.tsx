@@ -46,9 +46,9 @@ function toPreviewUrl(url: string): string {
       .replace(new RegExp(`_(\\d{3})S(\\.${ext})$`, "i"), "_$1L$2")
       .replace(new RegExp(`_(\\d{3})(\\.${ext})$`, "i"), "_$1L$2");
   }
-  // Render proxy can fail upstream for some images; use direct source URLs.
+  // Прямой <img> на carsensor.net даёт ERR_BLOCKED_BY_ORB; грузим через API.
   if (isCarsensorHttpsUrl(clean)) {
-    return clean;
+    return `${API_URL}/x/csimg?u=${encodeURIComponent(clean)}`;
   }
   return clean;
 }
