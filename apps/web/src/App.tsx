@@ -56,11 +56,12 @@ function toPreviewUrl(url: string): string {
 function Card({ car }: { car: Car }) {
   const main = car.images.find((item) => item.isMain)?.url ?? car.images[0]?.url;
   const sources = useMemo(() => {
-    if (!main) {
-      return [];
-    }
-    return [toPreviewUrl(main)];
-  }, [main]);
+    const ordered = [
+      ...(main ? [main] : []),
+      ...car.images.map((item) => item.url).filter((url) => url !== main)
+    ];
+    return Array.from(new Set(ordered.map((url) => toPreviewUrl(url))));
+  }, [car.images, main]);
 
   const [srcIndex, setSrcIndex] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -275,7 +276,11 @@ function CarDetails({
 }) {
   const allImages = useMemo(() => {
     const list = car.images.length > 0 ? car.images : [];
-    return list.map((item) => toPreviewUrl(item.url));
+    const ordered = [
+      ...list.filter((item) => !item.url.startsWith("/uploads/")),
+      ...list.filter((item) => item.url.startsWith("/uploads/"))
+    ];
+    return Array.from(new Set(ordered.map((item) => toPreviewUrl(item.url))));
   }, [car.images]);
 
   const [activeIndex, setActiveIndex] = useState(0);

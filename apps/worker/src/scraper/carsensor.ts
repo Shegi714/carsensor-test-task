@@ -17,6 +17,17 @@ const DEFAULT_LISTING_URL = `${BASE_URL}/usedcar/index.html`;
 const MAX_CARS_PER_RUN = 30;
 const MAX_IMAGES_PER_CAR = 16;
 const FETCH_TIMEOUT_MS = 15000;
+const FETCH_RETRIES = Number(process.env.CARSENSOR_FETCH_RETRIES ?? 4);
+const JINA_PROXY_BASE = "https://r.jina.ai/http";
+
+function fetchHtmlCandidates(url: string): string[] {
+  const list: string[] = [url];
+  // Fallback: r.jina.ai is a read-only proxy that often bypasses origin rate limits / TLS socket closes.
+  // Format: https://r.jina.ai/http(s)://example.com/path
+  const normalized = url.replace(/^http:\/\//i, "https://");
+  list.push(`${JINA_PROXY_BASE}/${normalized}`);
+  return [...new Set(list)];
+}
 
 function scoreJapaneseDecoding(value: string): number {
   const japaneseCount = (value.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g) ?? []).length;
@@ -209,33 +220,54 @@ function extractCsphotoUrlsFromHtml(html: string): string[] {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let lastError: unknown;
+  for (const candidateUrl of fetchHtmlCandidates(url)) {
+    for (let attempt = 0; attempt < FETCH_RETRIES; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const response = await fetch(candidateUrl, {
+          signal: controller.signal,
+          headers: {
+            "user-agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
+            accept: "text/html,application/xhtml+xml",
+            "accept-language": "ja,en-US;q=0.8,en;q=0.7,ru-RU;q=0.6,ru;q=0.5",
+            referer: BASE_URL
+          }
+        });
 
-  const response = await fetch(url, {
-    signal: controller.signal,
-    headers: {
-      "user-agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
-      accept: "text/html,application/xhtml+xml"
+        if (!response.ok) {
+          if ([408, 425, 429, 500, 502, 503, 504].includes(response.status)) {
+            throw new Error(`Transient status ${response.status} for ${candidateUrl}`);
+          }
+          throw new Error(`Failed to fetch ${candidateUrl}, status=${response.status}`);
+        }
+
+        const bytes = Buffer.from(await response.arrayBuffer());
+
+        // Jina proxy returns UTF-8 text; origin can be Shift_JIS.
+        const decodedCandidates = [
+          bytes.toString("utf-8"),
+          iconv.decode(bytes, "shift_jis"),
+          iconv.decode(bytes, "euc-jp")
+        ];
+
+        return decodedCandidates
+          .sort((a, b) => scoreJapaneseDecoding(b) - scoreJapaneseDecoding(a))
+          .at(0) as string;
+      } catch (error) {
+        lastError = error;
+        if (attempt < FETCH_RETRIES - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
     }
-  });
-  clearTimeout(timeout);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}, status=${response.status}`);
   }
 
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const decodedCandidates = [
-    bytes.toString("utf-8"),
-    iconv.decode(bytes, "shift_jis"),
-    iconv.decode(bytes, "euc-jp")
-  ];
-
-  return decodedCandidates
-    .sort((a, b) => scoreJapaneseDecoding(b) - scoreJapaneseDecoding(a))
-    .at(0) as string;
+  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch ${url}`);
 }
 
 function safeText(html: string, selectors: string[]): string | undefined {

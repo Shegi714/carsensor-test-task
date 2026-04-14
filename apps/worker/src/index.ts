@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { access } from "node:fs/promises";
 import dotenv from "dotenv";
 import cron from "node-cron";
 
@@ -15,6 +16,24 @@ const prisma = new PrismaClient();
 const IMAGE_CACHE_PASSES = Number(process.env.IMAGE_CACHE_PASSES ?? 4);
 /** Set to 1 once after upgrading photo URL logic so existing files are re-downloaded (same keys on disk). */
 const IMAGE_CACHE_FORCE = process.env.IMAGE_CACHE_FORCE === "1";
+const uploadsRoot =
+  process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim() !== ""
+    ? path.resolve(process.env.UPLOADS_DIR)
+    : path.resolve(__dirname, "../../../uploads");
+
+async function localUploadExists(url: string): Promise<boolean> {
+  if (!url.startsWith("/uploads/")) {
+    return false;
+  }
+  const relativePath = url.slice("/uploads/".length);
+  const diskPath = path.resolve(uploadsRoot, relativePath);
+  try {
+    await access(diskPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function syncCars() {
   console.log(`[worker] sync started at ${new Date().toISOString()}`);
@@ -46,6 +65,11 @@ async function syncCars() {
 
         const fallbackLocal = existingImages[index]?.url;
         if (fallbackLocal?.startsWith("/uploads/")) {
+          if (await localUploadExists(fallbackLocal)) {
+            finalImages.push(fallbackLocal);
+            continue;
+          }
+        } else if (fallbackLocal) {
           finalImages.push(fallbackLocal);
           continue;
         }
